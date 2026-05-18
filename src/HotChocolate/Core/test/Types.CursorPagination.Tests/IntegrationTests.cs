@@ -909,6 +909,38 @@ public class IntegrationTests
     }
 
     [Fact]
+    public async Task Infer_Multiple_Same_ConnectionNames_From_Nested_NodeType()
+    {
+        var schema =
+            await new ServiceCollection()
+                .AddGraphQL()
+                .AddQueryType<InferMultipleSameConnectionNameFromNodeType>()
+                .ModifyPagingOptions(o =>
+                {
+                    // Use the type name rather than the property
+                    // name for paging types.
+                    o.InferCollectionSegmentNameFromField = false;
+                    o.InferConnectionNameFromField = false;
+                })
+                .Services
+                .BuildServiceProvider()
+                .GetSchemaAsync();
+
+        schema.MatchSnapshot();
+    }
+
+    public class InferMultipleSameConnectionNameFromNodeType
+    {
+        [UsePaging]
+        public IQueryable<Author> GetAuthors() => new List<Author>().AsQueryable();
+
+        [UsePaging]
+        public IQueryable<Author> GetFavoriteAuthors() => new List<Author>().AsQueryable();
+
+        public record Author(string Name);
+    }
+
+    [Fact]
     public async Task SelectProviderByName()
     {
         var executor =
