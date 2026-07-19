@@ -370,6 +370,55 @@ public abstract class TypeFileBuilderBase(StringBuilder sb)
         if (resolver.Parameters.Any(p => p.Kind is ResolverParameterKind.Argument or ResolverParameterKind.Unknown))
         {
             var resolverMethod = (IMethodSymbol)resolver.Member;
+
+            Writer.WriteLine();
+            Writer.WriteIndentedLine("configuration.Member = context.ThisType.GetMethod(");
+            using (Writer.IncreaseIndent())
+            {
+                Writer.WriteIndentedLine(
+                    "\"{0}\",",
+                    resolver.Member.Name);
+                Writer.WriteIndentedLine(
+                    "global::{0},",
+                    resolver.IsStatic
+                        ? WellKnownTypes.StaticMemberFlags
+                        : WellKnownTypes.InstanceMemberFlags);
+                if (resolver.Parameters.Length == 0)
+                {
+                    Writer.WriteIndentedLine("global::System.Array.Empty<global::System.Type>());");
+                }
+                else
+                {
+                    var resolverMethods = (IMethodSymbol)resolver.Member;
+
+                    Writer.WriteIndentedLine("new global::System.Type[]");
+                    Writer.WriteIndentedLine("{");
+                    using (Writer.IncreaseIndent())
+                    {
+                        for (var i = 0; i < resolver.Parameters.Length; i++)
+                        {
+                            var parameter = resolver.Parameters[i];
+
+                            if (i > 0)
+                            {
+                                Writer.Write(',');
+                                Writer.WriteLine();
+                            }
+
+                            Writer.WriteIndented(
+                                "typeof({0})",
+                                ToFullyQualifiedString(parameter.Type, resolverMethods, typeLookup));
+                        }
+                    }
+
+                    Writer.WriteLine();
+                    Writer.WriteIndentedLine("})!;");
+                }
+            }
+
+            Writer.WriteLine();
+            Writer.WriteIndentedLine("var parameters = (configuration.Member as global::System.Reflection.MethodInfo)?.GetParameters();");
+
             var firstParameter = true;
             foreach (var parameter in resolver.Parameters)
             {
@@ -450,7 +499,8 @@ public abstract class TypeFileBuilderBase(StringBuilder sb)
                             "Input",
                             ",");
 
-                        Writer.WriteIndentedLine("RuntimeType = typeof({0})", parameterTypeString);
+                        Writer.WriteIndentedLine("RuntimeType = typeof({0}),", parameterTypeString);
+                        Writer.WriteIndentedLine("Parameter = parameters?[{0}]", parameter.Parameter.Ordinal);
                     }
 
                     Writer.WriteIndentedLine("};");
@@ -492,56 +542,6 @@ public abstract class TypeFileBuilderBase(StringBuilder sb)
 
                     Writer.WriteLine();
                     Writer.WriteIndentedLine("configuration.Arguments.Add(argumentConfiguration);");
-                }
-            }
-        }
-
-        if (resolver.DescriptorAttributes.Length > 0
-            || resolver.IsNodeResolver
-            || resolver.Kind is ResolverKind.ConnectionResolver)
-        {
-            Writer.WriteLine();
-            Writer.WriteIndentedLine("configuration.Member = context.ThisType.GetMethod(");
-            using (Writer.IncreaseIndent())
-            {
-                Writer.WriteIndentedLine(
-                    "\"{0}\",",
-                    resolver.Member.Name);
-                Writer.WriteIndentedLine(
-                    "global::{0},",
-                    resolver.IsStatic
-                        ? WellKnownTypes.StaticMemberFlags
-                        : WellKnownTypes.InstanceMemberFlags);
-                if (resolver.Parameters.Length == 0)
-                {
-                    Writer.WriteIndentedLine("global::System.Array.Empty<global::System.Type>());");
-                }
-                else
-                {
-                    var resolverMethods = (IMethodSymbol)resolver.Member;
-
-                    Writer.WriteIndentedLine("new global::System.Type[]");
-                    Writer.WriteIndentedLine("{");
-                    using (Writer.IncreaseIndent())
-                    {
-                        for (var i = 0; i < resolver.Parameters.Length; i++)
-                        {
-                            var parameter = resolver.Parameters[i];
-
-                            if (i > 0)
-                            {
-                                Writer.Write(',');
-                                Writer.WriteLine();
-                            }
-
-                            Writer.WriteIndented(
-                                "typeof({0})",
-                                ToFullyQualifiedString(parameter.Type, resolverMethods, typeLookup));
-                        }
-                    }
-
-                    Writer.WriteLine();
-                    Writer.WriteIndentedLine("})!;");
                 }
             }
         }
